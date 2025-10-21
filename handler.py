@@ -67,20 +67,34 @@ def load_lora(lora_path: str, lora_scale: float = 1.0, weight_name: str = None):
         print(f"Unloading previous LoRA: {CURRENT_LORA}")
         pipe.unload_lora_weights()
 
-    # Load new LoRA
+    # Load new LoRA (ai-toolkit LoRAs need key remapping)
     print(f"Loading LoRA: {lora_path} (scale: {lora_scale}, weight_name: {weight_name})")
 
-    if os.path.exists(lora_path):
-        # Local file
-        pipe.load_lora_weights(lora_path)
-    else:
-        # HuggingFace repo
-        if weight_name:
-            pipe.load_lora_weights(lora_path, weight_name=weight_name)
-        else:
-            pipe.load_lora_weights(lora_path)
+    # Load LoRA state dict and remap keys from diffusion_model -> transformer
+    from safetensors.torch import load_file
 
-    # Set LoRA scale
+    if os.path.exists(lora_path):
+        lora_state_dict = load_file(lora_path)
+    else:
+        # Download from HuggingFace
+        from huggingface_hub import hf_hub_download
+        weight_file = weight_name if weight_name else "pytorch_lora_weights.safetensors"
+        downloaded_path = hf_hub_download(lora_path, filename=weight_file)
+        lora_state_dict = load_file(downloaded_path)
+
+    # Remap keys: diffusion_model.* -> transformer.*
+    remapped_state_dict = {}
+    for key, value in lora_state_dict.items():
+        if key.startswith("diffusion_model."):
+            new_key = key.replace("diffusion_model.", "transformer.")
+            remapped_state_dict[new_key] = value
+        else:
+            remapped_state_dict[key] = value
+
+    # Load remapped LoRA
+    pipe.load_lora_weights(remapped_state_dict, adapter_name="lora1")
+
+    # Fuse with scale
     pipe.fuse_lora(lora_scale=lora_scale)
 
     CURRENT_LORA = lora_path
