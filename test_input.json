@@ -1,0 +1,15 @@
+{
+  "input": {
+    "prompt": "A serene Japanese garden with cherry blossoms, koi pond, and traditional architecture, soft morning light, highly detailed, photorealistic",
+    "negative_prompt": "blurry, low quality, distorted, ugly, bad anatomy",
+    "num_inference_steps": 50,
+    "true_cfg_scale": 4.0,
+    "width": 1024,
+    "height": 1024,
+    "seed": 42,
+    "lora_path": "/app/loras/ryze-lora.safetensors",
+    "lora_scale": 0.8,
+    "num_images": 1,
+    "output_format": "png"
+  }
+}
