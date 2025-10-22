@@ -13,9 +13,13 @@ import os
 import uuid
 import tempfile
 from pathlib import Path
+import requests
 
 # Import cloud storage for R2 uploads
 import cloud_storage
+
+# API endpoint for saving images to database
+API_BASE_URL = os.environ.get('API_BASE_URL', '').rstrip('/')
 
 # Global pipeline (loaded once on container start)
 print("=" * 60)
@@ -220,12 +224,16 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
 
         # Extract parameters with defaults
         prompt = job_input['prompt']
+        user_id = job_input.get('userId')  # Optional userId for database tracking
         negative_prompt = job_input.get('negative_prompt', '')
         num_inference_steps = job_input.get('num_inference_steps', 50)
         true_cfg_scale = job_input.get('true_cfg_scale', 4.0)
         width = job_input.get('width', 1024)
         height = job_input.get('height', 1024)
         seed = job_input.get('seed')
+
+        # Get job ID from event
+        job_id = event.get('id', str(uuid.uuid4()))
         # Default to Ryze LoRA from HuggingFace if no lora_path specified
         # If lora_path is explicitly set to None, it will be None (no LoRA)
         if 'lora_path' not in job_input:
@@ -293,6 +301,37 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
                         public_url = cloud_storage.get_public_url(object_name)
                         image_data['url'] = public_url
                         image_data['uploaded'] = True
+
+                        # Save to database if API endpoint configured
+                        if API_BASE_URL and user_id:
+                            try:
+                                save_response = requests.post(
+                                    f"{API_BASE_URL}/api/images/save",
+                                    json={
+                                        'jobId': job_id,
+                                        'userId': user_id,
+                                        'r2Url': public_url,
+                                        'r2Key': object_name,
+                                        'prompt': prompt,
+                                        'negativePrompt': negative_prompt,
+                                        'seed': seed,
+                                        'width': width,
+                                        'height': height,
+                                        'numInferenceSteps': num_inference_steps,
+                                        'trueCfgScale': true_cfg_scale,
+                                        'loraPath': lora_path,
+                                        'loraScale': lora_scale if lora_path else None,
+                                        'generatedBy': 'runpod'
+                                    },
+                                    timeout=10
+                                )
+                                if save_response.status_code == 200:
+                                    print(f"Successfully saved image to database: {public_url}")
+                                else:
+                                    print(f"Failed to save to database: {save_response.status_code} - {save_response.text}")
+                            except Exception as db_error:
+                                # Don't fail the job if database save fails
+                                print(f"Database save error (non-fatal): {db_error}")
                     else:
                         # Fallback to base64 if upload fails
                         img_base64 = image_to_base64(img, format=output_format)

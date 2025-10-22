@@ -19,3 +19,6 @@ huggingface_hub
 # Cloud storage (R2/S3)
 boto3>=1.26.0
 python-dotenv>=0.19.0
+
+# HTTP requests
+requests>=2.28.0
