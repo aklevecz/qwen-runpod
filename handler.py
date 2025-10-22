@@ -218,6 +218,14 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
     try:
         job_input = event.get('input', {})
 
+        # Log incoming request for debugging
+        print("=" * 60)
+        print("INCOMING REQUEST:")
+        print(f"Event keys: {list(event.keys())}")
+        print(f"Event ID: {event.get('id', 'NO ID')}")
+        print(f"Input: {job_input}")
+        print("=" * 60)
+
         # Validate required fields
         if 'prompt' not in job_input:
             return {'error': 'Missing required field: prompt'}
@@ -303,7 +311,11 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
                         image_data['uploaded'] = True
 
                         # Save to database if API endpoint configured
+                        print(f"API_BASE_URL: {API_BASE_URL or 'NOT SET'}")
+                        print(f"user_id: {user_id or 'NOT PROVIDED'}")
+
                         if API_BASE_URL and user_id:
+                            print(f"Attempting to save image to database at {API_BASE_URL}/api/images/save")
                             try:
                                 save_response = requests.post(
                                     f"{API_BASE_URL}/api/images/save",
